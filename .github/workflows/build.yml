@@ -1,7 +1,7 @@
 name: APK derle
 on:
   push:
-    branches: [main]
+    branches: [notlar]
   workflow_dispatch:
 jobs:
   build:
