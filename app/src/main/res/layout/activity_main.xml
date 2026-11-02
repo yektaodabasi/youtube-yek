@@ -11,6 +11,11 @@
         <Spinner android:id="@+id/siteSpinner"
             android:layout_width="0dp" android:layout_height="48dp"
             android:layout_weight="1"/>
+        <ImageButton android:id="@+id/btnSade"
+            android:src="@android:drawable/ic_menu_view"
+            android:contentDescription="Sadece video"
+            android:layout_width="48dp" android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"/>
         <ImageButton android:id="@+id/btnEkle"
             android:src="@android:drawable/ic_input_add"
             android:contentDescription="Ekle"

@@ -37,6 +37,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var adapter: ArrayAdapter<String>
     private var fullscreenView: View? = null
     private var kilitli = true
+    private var sadeceVideo = true
     private val siteler = mutableListOf<Site>()
     private val prefs by lazy { getSharedPreferences("ayar", MODE_PRIVATE) }
 
@@ -96,6 +97,8 @@ class MainActivity : AppCompatActivity() {
     private fun arayuzuKur() {
         if (::adapter.isInitialized) return
 
+        sadeceVideo = prefs.getBoolean("sadeceVideo", true)
+
         webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
@@ -104,7 +107,10 @@ class MainActivity : AppCompatActivity() {
             userAgentString = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 " +
                 "(KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36"
         }
-        webView.webViewClient = WebViewClient()
+        webView.webViewClient = object : WebViewClient() {
+            override fun onPageCommitVisible(view: WebView, url: String?) = enjekte(view)
+            override fun onPageFinished(view: WebView, url: String?) = enjekte(view)
+        }
         webView.webChromeClient = object : WebChromeClient() {
             override fun onShowCustomView(view: View, cb: CustomViewCallback) {
                 fullscreenView = view
@@ -126,7 +132,21 @@ class MainActivity : AppCompatActivity() {
         }
         findViewById<ImageButton>(R.id.btnEkle).setOnClickListener { siteEkle() }
         findViewById<ImageButton>(R.id.btnSil).setOnClickListener { siteSil() }
+
+        val btnSade = findViewById<ImageButton>(R.id.btnSade)
+        btnSade.alpha = if (sadeceVideo) 1f else 0.4f
+        btnSade.setOnClickListener {
+            sadeceVideo = !sadeceVideo
+            prefs.edit().putBoolean("sadeceVideo", sadeceVideo).apply()
+            btnSade.alpha = if (sadeceVideo) 1f else 0.4f
+            webView.reload()
+        }
+
         if (siteler.isEmpty()) siteEkle()
+    }
+
+    private fun enjekte(v: WebView) {
+        if (sadeceVideo) v.evaluateJavascript(SADECE_VIDEO_JS, null)
     }
 
     private fun tamEkranKapat() {
@@ -191,5 +211,127 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("İptal", null)
             .show()
+    }
+
+    companion object {
+        private val SADECE_VIDEO_JS = """
+(function () {
+  if (window.__sv) return;
+  window.__sv = true;
+
+  var EMBED   = /youtube|youtu\.be|vimeo|dailymotion|twitch|rutube|ok\.ru|streamable|embed|player|video/i;
+  var REKLAM  = /doubleclick|googlesyndication|adservice|adsystem|recaptcha|hcaptcha|facebook\.com\/plugins|disqus/i;
+  var VIDLINK = /watch|video|\/v\/|embed|izle|clip|episode|bolum|film|dizi|shorts/i;
+
+  var css =
+    'html,body{overflow:hidden!important;background:#000!important;margin:0!important}' +
+    'body>:not(#__sv){visibility:hidden!important}' +
+    '#__sv{position:fixed!important;top:0!important;left:0!important;right:0!important;bottom:0!important;' +
+      'z-index:2147483647!important;overflow-y:auto!important;background:#000!important;' +
+      'visibility:visible!important;display:block!important;margin:0!important;padding:0 0 40px!important}' +
+    '#__sv video,#__sv iframe{display:block!important;width:100vw!important;max-width:100vw!important;' +
+      'margin:0 0 8px!important;position:static!important;transform:none!important;opacity:1!important;' +
+      'visibility:visible!important;border:0!important;background:#000!important}' +
+    '#__sv video{height:auto!important;min-height:56.25vw!important;max-height:85vh!important}' +
+    '#__sv iframe{height:56.25vw!important}' +
+    '#__sv_l a{display:block;color:#ddd;padding:12px 16px;border-bottom:1px solid #222;' +
+      'text-decoration:none;font:16px/1.3 sans-serif}' +
+    '#__sv_m{color:#888;font:14px sans-serif;text-align:center;padding:40px 16px}';
+
+  function kap() {
+    var k = document.getElementById('__sv');
+    if (!k) {
+      k = document.createElement('div');
+      k.id = '__sv';
+      k.innerHTML = '<div id="__sv_v"></div><div id="__sv_l"></div>';
+      document.body.appendChild(k);
+    }
+    if (!document.getElementById('__sv_css')) {
+      var s = document.createElement('style');
+      s.id = '__sv_css';
+      s.textContent = css;
+      (document.head || document.documentElement).appendChild(s);
+    }
+    return k;
+  }
+
+  function videoMu(el) {
+    if (el.tagName === 'VIDEO') return true;
+    var src = el.getAttribute('src') || el.getAttribute('data-src') || '';
+    return EMBED.test(src) && !REKLAM.test(src);
+  }
+
+  function esc(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  }
+
+  function linkler(l) {
+    var gor = {}, html = '', n = 0;
+    var host = location.hostname.replace(/^www\./, '');
+    var as = document.getElementsByTagName('a');
+    for (var i = 0; i < as.length && n < 300; i++) {
+      var a = as[i], h = a.href;
+      if (!h || h.indexOf('http') !== 0) continue;
+      if (a.hostname.replace(/^www\./, '') !== host) continue;
+      h = h.split('#')[0];
+      if (h === location.href.split('#')[0] || gor[h]) continue;
+      var img = a.querySelector('img,picture,video');
+      if (!img && !VIDLINK.test(a.pathname + a.search)) continue;
+      var b = (a.getAttribute('title') || a.getAttribute('aria-label') ||
+               (img && img.getAttribute('alt')) || a.textContent || '')
+               .replace(/\s+/g, ' ').trim();
+      if (!b) continue;
+      gor[h] = 1; n++;
+      html += '<a href="' + esc(h) + '">' + esc(b.slice(0, 120)) + '</a>';
+    }
+    l.innerHTML = n ? html : '<div id="__sv_m">Bu sayfada video bulunamadı</div>';
+  }
+
+  var hazir = false, t;
+
+  function topla() {
+    if (!document.body) return;
+    var k = kap();
+    var v = document.getElementById('__sv_v'), l = document.getElementById('__sv_l');
+    var adaylar = document.querySelectorAll('video, iframe'), sayi = 0;
+    for (var i = 0; i < adaylar.length; i++) {
+      var el = adaylar[i];
+      if (k.contains(el)) { sayi++; continue; }
+      if (!videoMu(el)) continue;
+      el.removeAttribute('width'); el.removeAttribute('height');
+      if (el.tagName === 'VIDEO') {
+        el.controls = true;
+        el.setAttribute('playsinline', '');
+      } else {
+        if (!el.getAttribute('src') && el.getAttribute('data-src')) el.src = el.getAttribute('data-src');
+        el.setAttribute('allow', 'autoplay; fullscreen; encrypted-media; picture-in-picture');
+        el.setAttribute('allowfullscreen', '');
+      }
+      v.appendChild(el); sayi++;
+    }
+    if (sayi > 0) { if (l.firstChild) l.innerHTML = ''; }
+    else if (hazir && !l.querySelector('a')) linkler(l);
+  }
+
+  function basla() {
+    topla();
+    new MutationObserver(function () {
+      clearTimeout(t); t = setTimeout(topla, 300);
+    }).observe(document.documentElement,
+      { childList: true, subtree: true, attributes: true, attributeFilter: ['src', 'data-src'] });
+    setTimeout(function () { hazir = true; topla(); }, 1500);
+    var son = location.href;
+    setInterval(function () {
+      if (location.href !== son) {
+        son = location.href; hazir = false;
+        var l = document.getElementById('__sv_l'); if (l) l.innerHTML = '';
+        setTimeout(function () { hazir = true; topla(); }, 1500);
+      }
+    }, 500);
+  }
+
+  if (document.body) basla(); else document.addEventListener('DOMContentLoaded', basla);
+})();
+""".trimIndent()
     }
 }
