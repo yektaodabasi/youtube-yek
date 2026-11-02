@@ -3,6 +3,8 @@ on:
   push:
     branches: [notlar]
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -20,3 +22,16 @@ jobs:
         with:
           name: notlar-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+      - name: APK'yı notlar-apk dalına yaz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p /tmp/apk
+          cp app/build/outputs/apk/debug/app-debug.apk /tmp/apk/Notlar.apk
+          cd /tmp/apk
+          git init -q -b notlar-apk
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Notlar.apk
+          git commit -q -m "Notlar.apk — $GITHUB_SHA"
+          git push -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}" notlar-apk
